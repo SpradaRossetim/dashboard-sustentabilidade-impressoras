@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.env
+*.egg-info/
+dist/
+build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dados e arquivos grandes
+*.pdf
+*.xlsx
+*.xls
+*.docx
+*.zip
+*.rar
+*.db
+*.sqlite
+*.pth
+*.lib
+*.dll
+output/
+temp/
+cache/
