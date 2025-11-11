@@ -26,10 +26,10 @@ class MetodologiaCalculosSustentabilidade:
                 'details': 'Inclui: extração de petróleo, refino, produção de plástico, pigmentos, embalagem'
             },
             'electricity': {
-                'value': 0.5,  # kg CO2 por kWh
+                'value': 0.0817,  # kg CO2 por kWh - Fator oficial ONS Brasil 2023
                 'source': 'ONS (Operador Nacional do Sistema) - Fator de emissão do Brasil 2023',
                 'methodology': 'Mix energético brasileiro: hidrelétrica, térmica, eólica, solar',
-                'details': 'Baseado no mix energético brasileiro: 65% hidrelétrica, 20% térmica, 15% renováveis'
+                'details': 'Baseado no mix energético brasileiro limpo: 65% hidrelétrica, 20% térmica, 15% renováveis (matriz mais limpa que média global)'
             },
             'manufacturing': {
                 'value': 0.02,  # kg CO2 por página (fabricação da impressora)
@@ -390,6 +390,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
 
 
 

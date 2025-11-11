@@ -15,7 +15,7 @@ class CarbonFootprintCalculator:
         self.carbon_factors = {
             'paper_a4': 0.004,  # kg CO2 por página A4
             'toner_black': 0.08,  # kg CO2 por grama de toner
-            'electricity': 0.5,  # kg CO2 por kWh
+            'electricity': 0.0817,  # kg CO2 por kWh - ONS Brasil 2023 (matriz energética brasileira)
             'manufacturing': 0.02,  # kg CO2 por página (fabricação da impressora)
             'transport': 0.001,  # kg CO2 por página (transporte)
             'disposal': 0.0005   # kg CO2 por página (descarte)

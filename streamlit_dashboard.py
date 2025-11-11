@@ -14,6 +14,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 import time
+import io
+import base64
+from io import BytesIO
 
 # Configuração da página
 st.set_page_config(
@@ -155,7 +158,8 @@ class SustainabilityDashboard:
                 standby_energy = 720 * 0.05
                 idle_energy = 120 * 0.1
                 total_energy = printing_energy + standby_energy + idle_energy
-                components[component] = total_energy * 0.5
+                # Fator ONS Brasil 2023: 0.0817 kg CO₂/kWh (matriz energética brasileira)
+                components[component] = total_energy * 0.0817
             else:
                 components[component] = pages * factor
         
@@ -242,6 +246,62 @@ def main():
     
     st.sidebar.markdown("---")
     
+    # Seção de Exportação de Dados
+    st.sidebar.markdown("### 💾 Exportar Dados")
+    
+    # Calcular métricas para exportação (será usado depois)
+    dashboard = SustainabilityDashboard()
+    with st.spinner("Coletando dados da impressora..."):
+        printer_data = dashboard.get_printer_data()
+    
+    if printer_data.get('status') != 'online':
+        pages = 15000  # Dados simulados
+    else:
+        pages = printer_data['pages_printed']
+    
+    carbon_data_export = dashboard.calculate_carbon_footprint(pages)
+    sustainability_metrics_export = dashboard.calculate_sustainability_metrics(carbon_data_export)
+    environmental_equivalents_export = dashboard.get_environmental_equivalents(carbon_data_export['total'])
+    
+    # Preparar dados para exportação
+    export_data = {
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'pages_printed': pages,
+        'carbon_footprint': {
+            'total': carbon_data_export['total'],
+            'components': carbon_data_export['components']
+        },
+        'sustainability_metrics': sustainability_metrics_export,
+        'environmental_equivalents': environmental_equivalents_export
+    }
+    
+    # Botões de exportação
+    col_exp1, col_exp2 = st.sidebar.columns(2)
+    
+    with col_exp1:
+        # Exportar CSV
+        csv_data = export_to_csv(export_data)
+        st.download_button(
+            label="📊 CSV",
+            data=csv_data,
+            file_name=f"dados_sustentabilidade_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    
+    with col_exp2:
+        # Exportar JSON
+        json_data = export_to_json(export_data)
+        st.download_button(
+            label="📋 JSON",
+            data=json_data,
+            file_name=f"dados_sustentabilidade_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+            mime="application/json",
+            use_container_width=True
+        )
+    
+    st.sidebar.markdown("---")
+    
     # Seleção de visualização
     st.sidebar.markdown("### 📊 Navegação")
     view_option = st.sidebar.selectbox(
@@ -265,13 +325,7 @@ def main():
     Score e objetivos ambientais
     """)
     
-    # Inicializar dashboard
-    dashboard = SustainabilityDashboard()
-    
-    # Coletar dados
-    with st.spinner("Coletando dados da impressora..."):
-        printer_data = dashboard.get_printer_data()
-    
+    # Reutilizar dados já coletados acima (para evitar duplicação)
     if printer_data.get('status') != 'online':
         st.warning(f"⚠️ Impressora não conectada: {printer_data.get('error', 'Impressora offline')}")
         st.info("📊 Mostrando dados simulados para demonstração")
@@ -279,10 +333,10 @@ def main():
     else:
         pages = printer_data['pages_printed']
     
-    # Calcular métricas
-    carbon_data = dashboard.calculate_carbon_footprint(pages)
-    sustainability_metrics = dashboard.calculate_sustainability_metrics(carbon_data)
-    environmental_equivalents = dashboard.get_environmental_equivalents(carbon_data['total'])
+    # Calcular métricas (reutilizar dados já calculados)
+    carbon_data = carbon_data_export
+    sustainability_metrics = sustainability_metrics_export
+    environmental_equivalents = environmental_equivalents_export
     
     # Dashboard Principal
     if view_option == "Dashboard Principal":
@@ -703,6 +757,122 @@ def get_component_description(component):
         'disposal': 'Descarte de suprimentos e componentes'
     }
     return descriptions.get(component, 'Componente da pegada de carbono')
+
+def export_to_csv(data):
+    """Exporta dados para formato CSV"""
+    rows = []
+    
+    # Dados principais
+    rows.append(["Métrica", "Valor", "Unidade"])
+    rows.append(["Data/Hora", data['timestamp'], ""])
+    rows.append(["Páginas Impressas", data['pages_printed'], "páginas"])
+    rows.append(["Pegada de Carbono Total", f"{data['carbon_footprint']['total']:.2f}", "kg CO₂"])
+    
+    rows.append(["", "", ""])
+    rows.append(["Componentes da Pegada de Carbono", "", ""])
+    rows.append(["Componente", "Valor (kg CO₂)", "Percentual (%)"])
+    
+    total = data['carbon_footprint']['total']
+    components = data['carbon_footprint']['components']
+    
+    for component, value in components.items():
+        percentage = (value / total * 100) if total > 0 else 0
+        rows.append([component.capitalize(), f"{value:.2f}", f"{percentage:.1f}"])
+    
+    rows.append(["", "", ""])
+    rows.append(["Métricas de Sustentabilidade", "", ""])
+    rows.append(["Métrica", "Valor", "Unidade"])
+    rows.append(["Score de Sustentabilidade", f"{data['sustainability_metrics']['sustainability_score']:.1f}", "pontos"])
+    rows.append(["CO₂ por Página", f"{data['sustainability_metrics']['co2_per_page']:.6f}", "kg CO₂/página"])
+    rows.append(["ROI", f"{data['sustainability_metrics']['roi']:.1f}", "%"])
+    rows.append(["Economia Total", f"{data['sustainability_metrics']['total_savings']:.2f}", "R$"])
+    
+    rows.append(["", "", ""])
+    rows.append(["Equivalentes Ambientais", "", ""])
+    rows.append(["Equivalente", "Valor", "Unidade"])
+    rows.append(["Quilômetros de Carro", f"{data['environmental_equivalents']['car_km']:.1f}", "km"])
+    rows.append(["Árvores", f"{data['environmental_equivalents']['trees']:.1f}", "árvores"])
+    rows.append(["Lâmpadas (60W)", f"{data['environmental_equivalents']['lightbulb_hours']:.1f}", "horas"])
+    rows.append(["Banhos", f"{data['environmental_equivalents']['shower_minutes']:.1f}", "minutos"])
+    
+    # Converter para CSV
+    output = io.StringIO()
+    for row in rows:
+        output.write(','.join(str(cell) for cell in row) + '\n')
+    
+    return output.getvalue().encode('utf-8-sig')  # UTF-8 com BOM para Excel
+
+def export_to_json(data):
+    """Exporta dados para formato JSON"""
+    json_str = json.dumps(data, indent=2, ensure_ascii=False, default=str)
+    return json_str.encode('utf-8')
+
+def export_to_excel(data):
+    """Exporta dados para formato Excel"""
+    output = BytesIO()
+    
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        # Planilha 1: Resumo Geral
+        summary_data = {
+            'Métrica': ['Data/Hora', 'Páginas Impressas', 'Pegada de Carbono Total'],
+            'Valor': [
+                data['timestamp'],
+                data['pages_printed'],
+                f"{data['carbon_footprint']['total']:.2f} kg CO₂"
+            ]
+        }
+        df_summary = pd.DataFrame(summary_data)
+        df_summary.to_excel(writer, sheet_name='Resumo Geral', index=False)
+        
+        # Planilha 2: Componentes da Pegada
+        components = data['carbon_footprint']['components']
+        total = data['carbon_footprint']['total']
+        components_data = {
+            'Componente': list(components.keys()),
+            'Valor (kg CO₂)': [f"{v:.2f}" for v in components.values()],
+            'Percentual (%)': [f"{(v/total*100):.1f}" for v in components.values()]
+        }
+        df_components = pd.DataFrame(components_data)
+        df_components.to_excel(writer, sheet_name='Componentes', index=False)
+        
+        # Planilha 3: Métricas de Sustentabilidade
+        metrics_data = {
+            'Métrica': [
+                'Score de Sustentabilidade',
+                'CO₂ por Página',
+                'ROI',
+                'Economia Total'
+            ],
+            'Valor': [
+                f"{data['sustainability_metrics']['sustainability_score']:.1f} pontos",
+                f"{data['sustainability_metrics']['co2_per_page']:.6f} kg CO₂/página",
+                f"{data['sustainability_metrics']['roi']:.1f}%",
+                f"R$ {data['sustainability_metrics']['total_savings']:.2f}"
+            ]
+        }
+        df_metrics = pd.DataFrame(metrics_data)
+        df_metrics.to_excel(writer, sheet_name='Métricas', index=False)
+        
+        # Planilha 4: Equivalentes Ambientais
+        equivalents_data = {
+            'Equivalente': [
+                'Quilômetros de Carro',
+                'Árvores',
+                'Lâmpadas (60W)',
+                'Banhos'
+            ],
+            'Valor': [
+                f"{data['environmental_equivalents']['car_km']:.1f} km",
+                f"{data['environmental_equivalents']['trees']:.1f} árvores",
+                f"{data['environmental_equivalents']['lightbulb_hours']:.1f} horas",
+                f"{data['environmental_equivalents']['shower_minutes']:.1f} minutos"
+            ]
+        }
+        df_equivalents = pd.DataFrame(equivalents_data)
+        df_equivalents.to_excel(writer, sheet_name='Equivalentes', index=False)
+    
+    output.seek(0)
+    return output.getvalue()
 
 if __name__ == "__main__":
     main()
